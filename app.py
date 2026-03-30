@@ -1,15 +1,22 @@
 import streamlit as st
 import requests
 import google.generativeai as genai
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except:
+    pass
 # ===== Gemini Setup =====
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
 model = genai.GenerativeModel("gemini-pro")
 
+
 # ===== OpenRouter Key =====
-OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
+ OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 
 # ===== SYSTEM PROMPT =====
 SYSTEM_PROMPT = """
@@ -21,6 +28,7 @@ Help with:
 - EDA
 - Excel formulas
 - Interview preparation
+
 Always give practical examples with code.
 """
 
@@ -44,7 +52,18 @@ def login_user(username, password):
             "username": username,
             "password": password
         })
-        return res.json()
+
+        print("LOGIN STATUS:", res.status_code)
+        print("LOGIN RAW:", res.text)
+
+        if res.text.strip() == "":
+            return {"status": "error", "message": "Empty response from server"}
+
+        try:
+            return res.json()
+        except:
+            return {"status": "error", "message": res.text}
+
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -54,16 +73,28 @@ def register_user(username, password):
             "username": username,
             "password": password
         })
-        return res.json()
+
+        print("REGISTER STATUS:", res.status_code)
+        print("REGISTER RAW:", res.text)
+
+        if res.text.strip() == "":
+            return {"status": "error", "message": "Empty response from server"}
+
+        try:
+            return res.json()
+        except:
+            return {"status": "error", "message": res.text}
+
     except Exception as e:
         return {"status": "error", "message": str(e)}
-
 # ===== OPENROUTER =====
 def ask_openrouter(user_input):
     url = "https://openrouter.ai/api/v1/chat/completions"
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "http://localhost:8501",
+        "X-Title": "Data Analyst AI",
         "Content-Type": "application/json"
     }
 
@@ -78,9 +109,17 @@ def ask_openrouter(user_input):
     try:
         res = requests.post(url, headers=headers, json=data)
         result = res.json()
-        return result["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"⚠️ OpenRouter Error: {e}"
+        return result["choices"][0]["message"]["content"] if "choices" in result else "⚠️ OpenRouter Error"
+    except:
+        return "⚠️ OpenRouter Failed"
+
+# ===== OFFLINE =====
+def offline_ai(user_input):
+    if "sql" in user_input.lower():
+        return "SELECT * FROM table WHERE condition;"
+    elif "excel" in user_input.lower():
+        return "=SUM(A1:A10), =AVERAGE(A1:A10), =IF(A1>50,\"Pass\",\"Fail\")"
+    return "⚠️ Offline response only."
 
 # ===== LOGIN PAGE =====
 if not st.session_state.logged_in:
@@ -88,33 +127,39 @@ if not st.session_state.logged_in:
     st.title("🔐 Login / Register")
     tab1, tab2 = st.tabs(["Login", "Register"])
 
+    # ===== LOGIN =====
     with tab1:
         u = st.text_input("Username")
         p = st.text_input("Password", type="password")
 
         if st.button("Login"):
             result = login_user(u, p)
+
             if result.get("status") == "success":
                 st.session_state.logged_in = True
+                st.success("Login Successful 🎉")
                 st.rerun()
             else:
-                st.error(result.get("message"))
+                st.error(result.get("message", "Invalid login"))
 
+    # ===== REGISTER =====
     with tab2:
         u2 = st.text_input("New Username")
         p2 = st.text_input("New Password", type="password")
 
         if st.button("Register"):
             result = register_user(u2, p2)
+
             if result.get("status") == "success":
                 st.success("Registered Successfully 🎉")
             else:
-                st.error(result.get("message"))
+                st.error(result.get("message", "Registration Failed"))
 
 # ===== MAIN APP =====
 else:
 
     st.title("📊 Data Analyst AI Assistant")
+    st.success("Logged in successfully ✅")
 
     # ===== CSV =====
     st.subheader("📂 Upload CSV")
@@ -135,22 +180,34 @@ else:
         if st.button("Analyze Dataset"):
             summary = df.describe().to_string()
             try:
-                res = model.generate_content(summary)
+                res = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=summary
+                )
                 st.write(res.text)
-            except Exception as e:
-                st.error(e)
+            except:
                 st.write(ask_openrouter(summary))
 
     # ===== CHAT =====
     user_input = st.text_input("Ask question")
 
     if st.button("Ask") and user_input:
+
+        context = ""
+        for r, m in st.session_state.chat_history[-4:]:
+            context += f"{r}:{m}\n"
+
         try:
-            res = model.generate_content(user_input)
+            res = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=context + user_input
+            )
             reply = res.text
-        except Exception as e:
-            st.error(e)
-            reply = ask_openrouter(user_input)
+        except:
+            try:
+                reply = ask_openrouter(user_input)
+            except:
+                reply = offline_ai(user_input)
 
         st.session_state.chat_history.append(("You", user_input))
         st.session_state.chat_history.append(("Bot", reply))
