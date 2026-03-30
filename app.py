@@ -16,7 +16,7 @@ model = genai.GenerativeModel("gemini-pro")
 
 
 # ===== OpenRouter Key =====
- OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
+OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 
 # ===== SYSTEM PROMPT =====
 SYSTEM_PROMPT = """
