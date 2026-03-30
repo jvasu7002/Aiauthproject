@@ -11,7 +11,7 @@ st.set_page_config(page_title="Data Analyst AI", page_icon="📊")
 model = None
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel("gemini-1.5-flash")
 except Exception as e:
     st.sidebar.error(f"Gemini Error: {e}")
 
@@ -91,7 +91,6 @@ def ask_openrouter(user_input):
     data = {
         "model": "meta-llama/llama-3-8b-instruct",
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_input}
         ]
     }
@@ -99,7 +98,13 @@ def ask_openrouter(user_input):
     try:
         res = requests.post(url, headers=headers, json=data)
         result = res.json()
-        return result["choices"][0]["message"]["content"]
+
+        # 🔥 SAFE CHECK
+        if "choices" in result:
+            return result["choices"][0]["message"]["content"]
+        else:
+            return f"⚠️ OpenRouter Failed: {result}"
+
     except Exception as e:
         return f"⚠️ OpenRouter Error: {e}"
 
