@@ -82,9 +82,9 @@ def ask_openrouter(user_input):
     }
 
     data = {
-        "model": "mistralai/mistral-7b-instruct",
+        "model": "openchat/openchat-7b",  # ✅ FIXED
         "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": "You are a data analyst assistant."},
             {"role": "user", "content": user_input}
         ]
     }
