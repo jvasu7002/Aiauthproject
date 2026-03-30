@@ -1,21 +1,13 @@
 import streamlit as st
 import requests
-import os
 import google.generativeai as genai
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # =========================
-# 🔐 CONFIG
+# 🔐 SAFE GEMINI SETUP
 # =========================
-st.set_page_config(page_title="Data Analyst AI", page_icon="📊")
-
-st.title("📊 Data Analyst AI Assistant")
-
-# =========================
-# 🔑 API KEYS (SAFE LOAD)
-# =========================
-
 GEMINI_AVAILABLE = False
-OPENROUTER_API_KEY = ""
 
 try:
     if "GEMINI_API_KEY" in st.secrets:
@@ -24,26 +16,28 @@ try:
 except:
     pass
 
+# Gemini model (safe)
+def ask_gemini(prompt):
+    try:
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return None
+
+
+# =========================
+# 🔑 OPENROUTER KEY (FIXED INDENT + SAFE)
+# =========================
 try:
-    if "OPENROUTER_API_KEY" in st.secrets:
-        OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
+    OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 except:
-    pass
-
-
-# =========================
-# 🌐 BACKEND URL
-# =========================
-
-BASE_URL = "https://aiauthproject.onrender.com/AIAuthProject"
-REGISTER_URL = f"{BASE_URL}/register"
-LOGIN_URL = f"{BASE_URL}/login"
+    OPENROUTER_API_KEY = ""
 
 
 # =========================
 # 🧠 SYSTEM PROMPT
 # =========================
-
 SYSTEM_PROMPT = """
 You are an expert Data Analyst assistant.
 Help with:
@@ -59,18 +53,59 @@ Always give practical examples with code.
 
 
 # =========================
-# 🤖 AI FUNCTIONS
+# 🌐 API URLs
 # =========================
+REGISTER_URL = "https://aiauthproject.onrender.com/AIAuthProject/register"
+LOGIN_URL = "https://aiauthproject.onrender.com/AIAuthProject/login"
 
-def ask_gemini(user_input):
+st.set_page_config(page_title="Data Analyst AI", page_icon="📊")
+
+
+# =========================
+# 🧠 SESSION
+# =========================
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+
+# =========================
+# 🔐 AUTH FUNCTIONS (SAFE JSON)
+# =========================
+def safe_json(res):
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(SYSTEM_PROMPT + "\nUser: " + user_input)
-        return response.text
+        return res.json()
+    except:
+        return {"status": "error", "message": res.text}
+
+
+def login_user(username, password):
+    try:
+        res = requests.post(LOGIN_URL, data={
+            "username": username,
+            "password": password
+        })
+        return safe_json(res)
     except Exception as e:
-        return None
+        return {"status": "error", "message": str(e)}
 
 
+def register_user(username, password):
+    try:
+        res = requests.post(REGISTER_URL, data={
+            "username": username,
+            "password": password
+        })
+        return safe_json(res)
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# =========================
+# 🤖 OPENROUTER
+# =========================
 def ask_openrouter(user_input):
     if not OPENROUTER_API_KEY:
         return None
@@ -103,137 +138,118 @@ def ask_openrouter(user_input):
     return None
 
 
+# =========================
+# 📴 OFFLINE
+# =========================
 def offline_ai(user_input):
-    user_input = user_input.lower()
-
-    if "sql" in user_input:
-        return "Example SQL:\nSELECT * FROM table WHERE condition;"
-
-    elif "python" in user_input:
-        return "Example:\nimport pandas as pd\ndf = pd.read_csv('data.csv')"
-
-    elif "eda" in user_input:
-        return "EDA = Exploratory Data Analysis using stats & visualization."
-
-    return "⚠️ Offline mode response."
-
-
-# =========================
-# 🔐 AUTH FUNCTIONS
-# =========================
-
-def safe_json(response):
-    try:
-        return response.json()
-    except:
-        return {"status": "error", "message": response.text}
-
-
-def login_user(username, password):
-    try:
-        res = requests.post(LOGIN_URL, data={
-            "username": username,
-            "password": password
-        })
-        return safe_json(res)
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-def register_user(username, password):
-    try:
-        res = requests.post(REGISTER_URL, data={
-            "username": username,
-            "password": password
-        })
-        return safe_json(res)
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-# =========================
-# 🧠 SESSION STATE
-# =========================
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+    if "sql" in user_input.lower():
+        return "SELECT * FROM table WHERE condition;"
+    elif "excel" in user_input.lower():
+        return "=SUM(A1:A10), =AVERAGE(A1:A10)"
+    return "⚠️ Offline response only."
 
 
 # =========================
 # 🔐 LOGIN PAGE
 # =========================
-
 if not st.session_state.logged_in:
 
-    st.subheader("🔐 Login / Register")
-
+    st.title("🔐 Login / Register")
     tab1, tab2 = st.tabs(["Login", "Register"])
 
     with tab1:
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+        u = st.text_input("Username")
+        p = st.text_input("Password", type="password")
 
         if st.button("Login"):
-            result = login_user(username, password)
+            result = login_user(u, p)
 
             if result.get("status") == "success":
                 st.session_state.logged_in = True
                 st.success("Login Successful 🎉")
                 st.rerun()
             else:
-                st.error(result.get("message", "Invalid credentials ❌"))
+                st.error(result.get("message", "Invalid login"))
 
     with tab2:
-        username = st.text_input("New Username")
-        password = st.text_input("New Password", type="password")
+        u2 = st.text_input("New Username")
+        p2 = st.text_input("New Password", type="password")
 
         if st.button("Register"):
-            result = register_user(username, password)
+            result = register_user(u2, p2)
 
             if result.get("status") == "success":
                 st.success("Registered Successfully 🎉")
             else:
-                st.error(result.get("message", "Registration Failed ❌"))
+                st.error(result.get("message", "Registration Failed"))
 
 
 # =========================
-# 🤖 CHAT PAGE
+# 🚀 MAIN APP
 # =========================
-
 else:
 
+    st.title("📊 Data Analyst AI Assistant")
     st.success("Logged in successfully ✅")
 
-    user_input = st.text_input("Ask your question")
+    # ===== CSV =====
+    st.subheader("📂 Upload CSV")
+    file = st.file_uploader("Upload", type=["csv"])
+
+    if file:
+        df = pd.read_csv(file)
+        st.dataframe(df.head())
+        st.write(df.describe())
+
+        col = st.selectbox("Select column", df.columns)
+
+        if st.button("Generate Graph"):
+            plt.figure()
+            df[col].hist()
+            st.pyplot(plt)
+
+        if st.button("Analyze Dataset"):
+            summary = df.describe().to_string()
+
+            reply = None
+
+            if GEMINI_AVAILABLE:
+                reply = ask_gemini(summary)
+
+            if not reply:
+                reply = ask_openrouter(summary)
+
+            if not reply:
+                reply = "⚠️ Analysis not available"
+
+            st.write(reply)
+
+    # ===== CHAT =====
+    user_input = st.text_input("Ask question")
 
     if st.button("Ask") and user_input:
 
-        bot_reply = None
+        reply = None
 
-        # 1️⃣ Gemini
         if GEMINI_AVAILABLE:
-            bot_reply = ask_gemini(user_input)
+            reply = ask_gemini(user_input)
 
-        # 2️⃣ OpenRouter fallback
-        if not bot_reply:
-            bot_reply = ask_openrouter(user_input)
+        if not reply:
+            reply = ask_openrouter(user_input)
 
-        # 3️⃣ Offline fallback
-        if not bot_reply:
-            bot_reply = offline_ai(user_input)
+        if not reply:
+            reply = offline_ai(user_input)
 
         st.session_state.chat_history.append(("You", user_input))
-        st.session_state.chat_history.append(("Bot", bot_reply))
+        st.session_state.chat_history.append(("Bot", reply))
 
-    # Show chat
+    # ===== CHAT UI =====
     for role, msg in st.session_state.chat_history:
-        if role == "You":
-            st.markdown(f"**🧑 {role}:** {msg}")
-        else:
-            st.markdown(f"**🤖 {role}:** {msg}")
+        st.markdown(f"""
+        <div style='background:#111;padding:10px;border-radius:10px;margin:5px'>
+        <b>{role}:</b> {msg}
+        </div>
+        """, unsafe_allow_html=True)
 
     if st.button("Logout"):
         st.session_state.logged_in = False
