@@ -1,19 +1,10 @@
 import streamlit as st
 import requests
-import google.generativeai as genai
 import pandas as pd
 import matplotlib.pyplot as plt
 
 # ===== PAGE CONFIG =====
 st.set_page_config(page_title="Data Analyst AI", page_icon="📊")
-
-# ===== GEMINI SETUP =====
-model = None
-try:
-    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
-except Exception as e:
-    st.sidebar.error(f"Gemini Error: {e}")
 
 # ===== OPENROUTER KEY =====
 OPENROUTER_API_KEY = st.secrets.get("OPENROUTER_API_KEY", "")
@@ -79,7 +70,7 @@ def register_user(username, password):
 # ===== OPENROUTER =====
 def ask_openrouter(user_input):
     if not OPENROUTER_API_KEY:
-        return "⚠️ OpenRouter API key missing."
+        return "⚠️ Please add OpenRouter API key."
 
     url = "https://openrouter.ai/api/v1/chat/completions"
 
@@ -91,8 +82,9 @@ def ask_openrouter(user_input):
     }
 
     data = {
-        "model": "meta-llama/llama-3-8b-instruct",
+        "model": "mistralai/mistral-7b-instruct",
         "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_input}
         ]
     }
@@ -104,21 +96,10 @@ def ask_openrouter(user_input):
         if "choices" in result:
             return result["choices"][0]["message"]["content"]
         else:
-            return f"⚠️ OpenRouter Failed: {result}"
+            return f"⚠️ API Error: {result}"
 
     except Exception as e:
-        return f"⚠️ OpenRouter Error: {e}"
-
-# ===== AI RESPONSE =====
-def get_ai_response(prompt):
-    if model:
-        try:
-            res = model.generate_content(prompt)
-            return res.text
-        except Exception as e:
-            st.warning(f"Gemini failed: {e}")
-
-    return ask_openrouter(prompt)
+        return f"⚠️ Error: {e}"
 
 # ===== LOGIN PAGE =====
 if not st.session_state.logged_in:
@@ -172,13 +153,13 @@ else:
 
         if st.button("Analyze Dataset"):
             summary = df.describe().to_string()
-            st.write(get_ai_response(summary))
+            st.write(ask_openrouter(summary))
 
     # ===== CHAT =====
     user_input = st.text_input("Ask question")
 
     if st.button("Ask") and user_input:
-        reply = get_ai_response(user_input)
+        reply = ask_openrouter(user_input)
         st.session_state.chat_history.append(("You", user_input))
         st.session_state.chat_history.append(("Bot", reply))
 
