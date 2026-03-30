@@ -11,7 +11,7 @@ st.set_page_config(page_title="Data Analyst AI", page_icon="📊")
 model = None
 try:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("models/gemini-1.5-flash-latest")
 except Exception as e:
     st.sidebar.error(f"Gemini Error: {e}")
 
@@ -85,6 +85,8 @@ def ask_openrouter(user_input):
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "HTTP-Referer": "http://localhost:8501",
+        "X-Title": "Data Analyst AI",
         "Content-Type": "application/json"
     }
 
@@ -99,7 +101,6 @@ def ask_openrouter(user_input):
         res = requests.post(url, headers=headers, json=data)
         result = res.json()
 
-        # 🔥 SAFE CHECK
         if "choices" in result:
             return result["choices"][0]["message"]["content"]
         else:
