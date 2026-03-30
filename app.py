@@ -82,7 +82,7 @@ def ask_openrouter(user_input):
     }
 
     data = {
-        "model": "openchat/openchat-7b",  # ✅ FIXED
+        "model": "meta-llama/llama-3-8b-instruct",  # ✅ FINAL FIX
         "messages": [
             {"role": "system", "content": "You are a data analyst assistant."},
             {"role": "user", "content": user_input}
