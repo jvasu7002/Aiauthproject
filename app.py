@@ -18,7 +18,7 @@ response = model.generate_content("Hello")
 print(response.text)
 
 # ===== OpenRouter Key =====
-OPENROUTER_API_KEY = st.secrets["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"]
+OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 
 # ===== SYSTEM PROMPT =====
 SYSTEM_PROMPT = """
