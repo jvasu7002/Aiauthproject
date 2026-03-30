@@ -1,15 +1,24 @@
 import streamlit as st
 import requests
-from google import genai
+import google.generativeai as genai
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
+try:
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+except:
+    pass
 # ===== Gemini Setup =====
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+
+model = genai.GenerativeModel("gemini-pro")
+
+response = model.generate_content("Hello")
+print(response.text)
 
 # ===== OpenRouter Key =====
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = st.secrets["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"]
 
 # ===== SYSTEM PROMPT =====
 SYSTEM_PROMPT = """
